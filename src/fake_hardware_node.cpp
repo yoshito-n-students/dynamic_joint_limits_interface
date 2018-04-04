@@ -13,7 +13,7 @@ namespace hi = hardware_interface;
 
 class FakeHW : public hardware_interface::RobotHW {
 public:
-  FakeHW() : pos_(0.), vel_(0.), eff_(0.) {}
+  FakeHW() : pos_(0.), vel_(0.), eff_(0.), pos_cmd_(0.), vel_cmd_(0.), eff_cmd_(0.) {}
 
   virtual ~FakeHW() {}
 
