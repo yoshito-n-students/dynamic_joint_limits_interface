@@ -1,3 +1,4 @@
+#include <controller_manager/controller_manager.h>
 #include <dynamic_joint_limits_interface/dynamic_joint_limits_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/console.h>
@@ -12,9 +13,13 @@ namespace hi = hardware_interface;
 
 class FakeHW : public hardware_interface::RobotHW {
 public:
-  FakeHW(const ros::NodeHandle &limits_nh) : limits_nh_(limits_nh), pos_(0.), vel_(0.), eff_(0.) {}
+  FakeHW() : pos_(0.), vel_(0.), eff_(0.) {}
+
+  virtual ~FakeHW() {}
 
   virtual bool init(ros::NodeHandle &root_nh, ros::NodeHandle &hw_nh) {
+    root_nh_ = root_nh;
+
     // register command interfaces to accept commands from controllers
     registerInterface(&pos_iface_);
     registerInterface(&vel_iface_);
@@ -38,9 +43,9 @@ public:
   }
 
   virtual void write(const ros::Time &time, const ros::Duration &period) {
-    pos_sat_iface_.updateLimits(limits_nh_);
-    vel_sat_iface_.updateLimits(limits_nh_);
-    eff_sat_iface_.updateLimits(limits_nh_);
+    pos_sat_iface_.updateLimits(root_nh_);
+    vel_sat_iface_.updateLimits(root_nh_);
+    eff_sat_iface_.updateLimits(root_nh_);
 
     pos_sat_iface_.enforceLimits(period);
     vel_sat_iface_.enforceLimits(period);
@@ -52,7 +57,7 @@ public:
   }
 
 private:
-  ros::NodeHandle limits_nh_;
+  ros::NodeHandle root_nh_;
 
   hi::PositionJointInterface pos_iface_;
   hi::VelocityJointInterface vel_iface_;
@@ -68,15 +73,24 @@ private:
 
 int main(int argc, char *argv[]) {
   ros::init(argc, argv, "fake_hardware");
-  ros::NodeHandle nh;
+  ros::NodeHandle nh, pnh("~");
 
-  FakeHW fake_hw(nh);
+  FakeHW fake_hw;
+  if (!fake_hw.init(nh, pnh)) {
+    ROS_FATAL("Failed to init hardware");
+    return 1;
+  }
+
+  controller_manager::ControllerManager controllers(&fake_hw);
+  ros::AsyncSpinner spinner(1);
+  spinner.start();
 
   ros::Rate rate(20.);
   ros::Time last(ros::Time::now());
   while (ros::ok()) {
     const ros::Time now(ros::Time::now());
     const ros::Duration period(now - last);
+    controllers.update(now, period);
     fake_hw.write(now, period);
     last = now;
     rate.sleep();

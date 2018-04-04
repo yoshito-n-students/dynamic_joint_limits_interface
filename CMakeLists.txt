@@ -8,6 +8,7 @@ project(dynamic_joint_limits_interface)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  controller_manager
   hardware_interface
   joint_limits_interface
   roscpp
@@ -105,7 +106,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
 #  LIBRARIES dynamic_joint_limits_interface
-  CATKIN_DEPENDS hardware_interface joint_limits_interface roscpp
+  CATKIN_DEPENDS controller_manager hardware_interface joint_limits_interface roscpp
 #  DEPENDS system_lib
 )
 
