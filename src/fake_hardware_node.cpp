@@ -39,14 +39,21 @@ public:
     vel_sat_iface_.registerHandle(djli::DynamicVelocityJointSaturationHandle(vel_handle));
     eff_sat_iface_.registerHandle(djli::DynamicEffortJointSaturationHandle(eff_handle));
 
-    return true;
-  }
-
-  virtual void write(const ros::Time &time, const ros::Duration &period) {
+    // do first update which will perform blocking access to the paremeter server
     pos_sat_iface_.updateLimits(root_nh_);
     vel_sat_iface_.updateLimits(root_nh_);
     eff_sat_iface_.updateLimits(root_nh_);
 
+    return true;
+  }
+
+  virtual void write(const ros::Time &time, const ros::Duration &period) {
+    // update limits with cached parameters subscribed in background
+    pos_sat_iface_.updateLimits(root_nh_);
+    vel_sat_iface_.updateLimits(root_nh_);
+    eff_sat_iface_.updateLimits(root_nh_);
+
+    // apply limits to commands
     pos_sat_iface_.enforceLimits(period);
     vel_sat_iface_.enforceLimits(period);
     eff_sat_iface_.enforceLimits(period);
