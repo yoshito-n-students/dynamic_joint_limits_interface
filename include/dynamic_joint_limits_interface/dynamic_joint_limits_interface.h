@@ -84,8 +84,6 @@ public:
       : jh_(jh), limits_(limits) {
     // never throw dislike joint_limits_interface::VelocityJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
-    if (!limits.has_velocity_limits) {
-    }
   }
 
   virtual ~DynamicVelocityJointSaturationHandle() {}
