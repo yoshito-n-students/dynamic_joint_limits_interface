@@ -229,6 +229,15 @@ public:
       resource_pair.second.reset();
     }
   }
+
+  bool reset(const std::string &name) {
+    ResourceMap::iterator handle(resource_map_.find(name));
+    if (handle == resource_map_.end()) {
+      return false;
+    }
+    handle->second.reset();
+    return true;
+  }
 };
 
 class DynamicVelocityJointSaturationInterface
