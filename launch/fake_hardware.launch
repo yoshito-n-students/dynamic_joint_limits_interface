@@ -1,0 +1,32 @@
+<launch>
+    <!-- -->
+    <!-- a fake hardware which has dynamic_joint_limits_interface -->
+    <node name="fake_hardware" pkg="dynamic_joint_limits_interface" type="fake_hardware_node" output="screen"/>
+    <!-- -->
+    <!-- a controller starter (load + start) -->
+    <node name="controller_starter" pkg="controller_manager" type="spawner" respawn="false" output="screen" 
+          args="position_controller"/>
+    <!-- -->
+    <!-- a controller loader (just load) -->
+    <node name="controller_loader" pkg="controller_manager" type="spawner" respawn="false" output="screen" 
+          args="--stopped velocity_controller effort_controller"/>
+    <!-- -->
+    <!-- controller decsriptions -->
+    <param name="position_controller/type" value="position_controllers/JointPositionController" />
+    <param name="position_controller/joint" value="joint" />
+    <param name="velocity_controller/type" value="velocity_controllers/JointVelocityController" />
+    <param name="velocity_controller/joint" value="joint" />
+    <param name="effort_controller/type" value="effort_controllers/JointEffortController" />
+    <param name="effort_controller/joint" value="joint" />
+    <!-- -->
+    <!-- joint limits -->
+    <group ns="joint_limits/joint">
+        <param name="has_position_limits" value="true"/>
+        <param name="min_position" value="10.0"/>
+        <param name="max_position" value="10.0"/>
+        <param name="has_velocity_limits" value="true"/>
+        <param name="max_velocity" value="5.0"/>
+        <param name="has_effort_limits" value="true"/>
+        <param name="max_effort" value="3.0"/>
+    </group>
+</launch>
