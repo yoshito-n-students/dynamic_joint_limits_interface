@@ -1,5 +1,8 @@
+#include <cmath>
+
 #include <controller_manager/controller_manager.h>
 #include <dynamic_joint_limits_interface/dynamic_joint_limits_interface.h>
+#include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/console.h>
 #include <ros/duration.h>
@@ -21,12 +24,14 @@ public:
     root_nh_ = root_nh;
 
     // register command interfaces to accept commands from controllers
+    registerInterface(&state_iface_);
     registerInterface(&pos_iface_);
     registerInterface(&vel_iface_);
     registerInterface(&eff_iface_);
 
     // register command handles so that controllers can find the joint
     const hi::JointStateHandle state_handle("joint", &pos_, &vel_, &eff_);
+    state_iface_.registerHandle(state_handle);
     const hi::JointHandle pos_handle(state_handle, &pos_cmd_);
     pos_iface_.registerHandle(pos_handle);
     const hi::JointHandle vel_handle(state_handle, &vel_cmd_);
@@ -47,6 +52,19 @@ public:
     return true;
   }
 
+  virtual void read(const ros::Time &time, const ros::Duration &period) {
+    // TODO: couple pos & vel & eff
+    if (!std::isnan(pos_cmd_)) {
+      pos_ = pos_cmd_;
+    }
+    if (!std::isnan(vel_cmd_)) {
+      vel_ = vel_cmd_;
+    }
+    if (!std::isnan(eff_cmd_)) {
+      eff_ = eff_cmd_;
+    }
+  }
+
   virtual void write(const ros::Time &time, const ros::Duration &period) {
     // update limits with cached parameters subscribed in background
     pos_sat_iface_.updateLimits(root_nh_);
@@ -57,14 +75,12 @@ public:
     pos_sat_iface_.enforceLimits(period);
     vel_sat_iface_.enforceLimits(period);
     eff_sat_iface_.enforceLimits(period);
-
-    ROS_INFO_STREAM("pos_cmd: " << pos_cmd_);
-    ROS_INFO_STREAM("vel_cmd: " << vel_cmd_);
-    ROS_INFO_STREAM("eff_cmd: " << eff_cmd_);
   }
 
 private:
   ros::NodeHandle root_nh_;
+
+  hardware_interface::JointStateInterface state_iface_;
 
   hi::PositionJointInterface pos_iface_;
   hi::VelocityJointInterface vel_iface_;
@@ -97,6 +113,7 @@ int main(int argc, char *argv[]) {
   while (ros::ok()) {
     const ros::Time now(ros::Time::now());
     const ros::Duration period(now - last);
+    fake_hw.read(now, period);
     controllers.update(now, period);
     fake_hw.write(now, period);
     last = now;

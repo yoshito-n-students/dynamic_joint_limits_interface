@@ -1,6 +1,7 @@
 #ifndef DYNAMIC_JOINT_LIMITS_INTERFACE_DYNAMIC_JOINT_LIMITS_INTERFACE_H
 #define DYNAMIC_JOINT_LIMITS_INTERFACE_DYNAMIC_JOINT_LIMITS_INTERFACE_H
 
+#include <cmath>
 #include <limits>
 #include <string>
 
@@ -38,8 +39,8 @@ public:
       prev_cmd_ = jh_.getPosition();
     }
 
-    double min_pos(std::numeric_limits< double >::quiet_NaN());
-    double max_pos(std::numeric_limits< double >::quiet_NaN());
+    double min_pos(-std::numeric_limits< double >::max());
+    double max_pos(std::numeric_limits< double >::max());
     if (limits_.has_position_limits && limits_.has_velocity_limits) {
       // position & velocity limits available
       const double delta_pos(limits_.max_velocity * period.toSec());
@@ -56,12 +57,7 @@ public:
       max_pos = prev_cmd_ + delta_pos;
     }
 
-    double cmd;
-    if (!std::isnan(min_pos) && !std::isnan(max_pos)) {
-      cmd = boost::algorithm::clamp(jh_.getCommand(), min_pos, max_pos);
-    } else {
-      cmd = jh_.getCommand();
-    }
+    const double cmd(boost::algorithm::clamp(jh_.getCommand(), min_pos, max_pos));
     jh_.setCommand(cmd);
     prev_cmd_ = cmd;
   }
@@ -91,10 +87,10 @@ public:
   std::string getName() const { return jh_.getName(); }
 
   void enforceLimits(const ros::Duration &period) {
-    double min_vel(std::numeric_limits< double >::quiet_NaN());
-    double max_vel(std::numeric_limits< double >::quiet_NaN());
+    double min_vel(-std::numeric_limits< double >::max());
+    double max_vel(std::numeric_limits< double >::max());
     if (limits_.has_velocity_limits && limits_.has_acceleration_limits) {
-      // velocity&acceleration limits available
+      // velocity & acceleration limits available
       const double vel(jh_.getVelocity());
       const double delta_vel(limits_.max_acceleration * period.toSec());
       min_vel = std::max(vel - delta_vel, -limits_.max_velocity);
@@ -111,13 +107,7 @@ public:
       max_vel = vel + delta_vel;
     }
 
-    double cmd;
-    if (!isnan(min_vel) && !isnan(max_vel)) {
-      cmd = boost::algorithm::clamp(jh_.getCommand(), min_vel, max_vel);
-    } else {
-      cmd = jh_.getCommand();
-    }
-    jh_.setCommand(cmd);
+    jh_.setCommand(boost::algorithm::clamp(jh_.getCommand(), min_vel, max_vel));
   }
 
   void updateLimits(ros::NodeHandle &nh) { getJointLimitsCached(getName(), nh, limits_); }
@@ -142,8 +132,8 @@ public:
   std::string getName() const { return jh_.getName(); }
 
   void enforceLimits(const ros::Duration & /* period */) {
-    double min_eff(std::numeric_limits< double >::quiet_NaN());
-    double max_eff(std::numeric_limits< double >::quiet_NaN());
+    double min_eff(-std::numeric_limits< double >::max());
+    double max_eff(std::numeric_limits< double >::max());
     // use effort limits if available
     if (limits_.has_effort_limits) {
       min_eff = -limits_.max_effort;
@@ -168,21 +158,7 @@ public:
       }
     }
 
-    double cmd;
-    if (!std::isnan(min_eff) && !std::isnan(max_eff)) {
-      // lower & upper limits available
-      cmd = boost::algorithm::clamp(jh_.getCommand(), min_eff, max_eff);
-    } else if (!std::isnan(min_eff) && std::isnan(max_eff)) {
-      // lower limit only
-      cmd = std::max(jh_.getCommand(), min_eff);
-    } else if (std::isnan(min_eff) && !std::isnan(max_eff)) {
-      // upper limit only
-      cmd = std::min(jh_.getCommand(), max_eff);
-    } else {
-      // no limits
-      cmd = jh_.getCommand();
-    }
-    jh_.setCommand(cmd);
+    jh_.setCommand(boost::algorithm::clamp(jh_.getCommand(), min_eff, max_eff));
   }
 
   void updateLimits(ros::NodeHandle &nh) { getJointLimitsCached(getName(), nh, limits_); }
@@ -197,7 +173,7 @@ private:
 
 template < class LimitsHandle >
 class DynamicJointLimitsInterface : public hardware_interface::ResourceManager< LimitsHandle > {
-private:
+protected:
   typedef typename hardware_interface::ResourceManager< LimitsHandle > Base;
 
 public:
@@ -231,7 +207,7 @@ public:
   }
 
   bool reset(const std::string &name) {
-    ResourceMap::iterator handle(resource_map_.find(name));
+    const ResourceMap::iterator handle(resource_map_.find(name));
     if (handle == resource_map_.end()) {
       return false;
     }
