@@ -9,6 +9,15 @@
 
 namespace dynamic_joint_limits_interface {
 
+// helper macro to try loading a cached param
+#define DJLI_GET_CACHE(name, value) const bool value##_loaded(limits_nh.getParamCached(name, value))
+
+// Note about getParamCached()
+//   - first call: start subscribing the parameter with access to the param server
+//   - second call or futher: read local cache without access to the param server
+// => to never access the param server except the first call of following functions,
+//    all calls of getParamCached() are made outside of if-statements.
+
 // this is almost equivarent to joint_limits_interface::getJointLimits()
 // but uses getParamCached() instead of getParam() to avoid blocking access to the parameter server
 inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeHandle &nh,
@@ -23,15 +32,6 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
     ROS_ERROR_STREAM(ex.what());
     return false;
   }
-
-    // helper macro to try loading a cached param
-#define DJLI_GET_CACHE(name, value) const bool value##_loaded(limits_nh.getParamCached(name, value))
-
-  // Note about getParamCached()
-  //   - first call: start subscribing the parameter with access to the param server
-  //   - second call or futher: read local cache without access to the param server
-  // => to never access the param server except the first call of this function,
-  //    all calls of getParamCached() are made outside of if-statements.
 
   // Position limits
   bool has_pos_limits(false);
@@ -112,6 +112,44 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
     if (has_eff_limits && max_eff_loaded) {
       limits.has_effort_limits = true;
       limits.max_effort = max_eff;
+    }
+  }
+
+  return true;
+}
+
+// this is almost equivarent to joint_limits_interface::getSoftJointLimits()
+// but uses getParamCached() instead of getParam() to avoid blocking access to the parameter server
+inline bool getSoftJointLimitsCached(const std::string &joint_name, const ros::NodeHandle &nh,
+                                     joint_limits_interface::SoftJointLimits &soft_limits) {
+  // Node handle scoped where the soft joint limits are defined
+  ros::NodeHandle limits_nh;
+  try {
+    // never check parameter exists by hasParam() dislike
+    // joint_limits_interface::getSoftJointLimits()
+    // because we want to start caching parameters in background anyway
+    limits_nh = ros::NodeHandle(nh, "joint_limits/" + joint_name);
+  } catch (const ros::InvalidNameException &ex) {
+    ROS_ERROR_STREAM(ex.what());
+    return false;
+  }
+
+  // Override soft limits if complete specification is found
+  bool has_soft_limits;
+  DJLI_GET_CACHE("has_soft_limits", has_soft_limits);
+  double k_position, k_velocity;
+  DJLI_GET_CACHE("k_position", k_position);
+  DJLI_GET_CACHE("k_velocity", k_velocity);
+  double soft_upper_limit, soft_lower_limit;
+  DJLI_GET_CACHE("soft_upper_limit", soft_upper_limit);
+  DJLI_GET_CACHE("soft_lower_limit", soft_lower_limit);
+  if (has_soft_limits_loaded) {
+    if (has_soft_limits && k_position_loaded && k_velocity_loaded && soft_lower_limit_loaded &&
+        soft_upper_limit_loaded) {
+      soft_limits.k_position = k_position;
+      soft_limits.k_velocity = k_velocity;
+      soft_limits.max_position = soft_upper_limit;
+      soft_limits.min_position = soft_lower_limit;
     }
   }
 
