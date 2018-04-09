@@ -24,75 +24,94 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
     return false;
   }
 
+    // helper macro to try loading a cached param
+#define DJLI_GET_CACHE(name, value) const bool value##_loaded(limits_nh.getParamCached(name, value))
+
+  // Note about getParamCached()
+  //   - first call: start subscribing the parameter with access to the param server
+  //   - second call or futher: read local cache without access to the param server
+  // => to never access the param server except the first call of this function,
+  //    all calls of getParamCached() are made outside of if-statements.
+
   // Position limits
-  bool has_position_limits = false;
-  if (limits_nh.getParamCached("has_position_limits", has_position_limits)) {
-    if (!has_position_limits) {
+  bool has_pos_limits(false);
+  DJLI_GET_CACHE("has_position_limits", has_pos_limits);
+  double min_pos, max_pos;
+  DJLI_GET_CACHE("min_position", min_pos);
+  DJLI_GET_CACHE("max_position", max_pos);
+  bool angle_wraparound;
+  DJLI_GET_CACHE("angle_wraparound", angle_wraparound);
+  if (has_pos_limits_loaded) {
+    if (!has_pos_limits) {
       limits.has_position_limits = false;
     }
-    double min_pos, max_pos;
-    if (has_position_limits && limits_nh.getParamCached("min_position", min_pos) &&
-        limits_nh.getParamCached("max_position", max_pos)) {
+    if (has_pos_limits && min_pos_loaded && max_pos_loaded) {
       limits.has_position_limits = true;
       limits.min_position = min_pos;
       limits.max_position = max_pos;
     }
-
-    bool angle_wraparound;
-    if (!has_position_limits && limits_nh.getParamCached("angle_wraparound", angle_wraparound)) {
+    if (!has_pos_limits && angle_wraparound_loaded) {
       limits.angle_wraparound = angle_wraparound;
     }
   }
 
   // Velocity limits
-  bool has_velocity_limits = false;
-  if (limits_nh.getParamCached("has_velocity_limits", has_velocity_limits)) {
-    if (!has_velocity_limits) {
+  bool has_vel_limits(false);
+  DJLI_GET_CACHE("has_velocity_limits", has_vel_limits);
+  double max_vel;
+  DJLI_GET_CACHE("max_velocity", max_vel);
+  if (has_vel_limits_loaded) {
+    if (!has_vel_limits) {
       limits.has_velocity_limits = false;
     }
-    double max_vel;
-    if (has_velocity_limits && limits_nh.getParamCached("max_velocity", max_vel)) {
+    if (has_vel_limits && max_vel_loaded) {
       limits.has_velocity_limits = true;
       limits.max_velocity = max_vel;
     }
   }
 
   // Acceleration limits
-  bool has_acceleration_limits = false;
-  if (limits_nh.getParamCached("has_acceleration_limits", has_acceleration_limits)) {
-    if (!has_acceleration_limits) {
+  bool has_acc_limits(false);
+  DJLI_GET_CACHE("has_acceleration_limits", has_acc_limits);
+  double max_acc;
+  DJLI_GET_CACHE("max_acceleration", max_acc);
+  if (has_acc_limits_loaded) {
+    if (!has_acc_limits) {
       limits.has_acceleration_limits = false;
     }
-    double max_acc;
-    if (has_acceleration_limits && limits_nh.getParamCached("max_acceleration", max_acc)) {
+    if (has_acc_limits && max_acc_loaded) {
       limits.has_acceleration_limits = true;
       limits.max_acceleration = max_acc;
     }
   }
 
   // Jerk limits
-  bool has_jerk_limits = false;
-  if (limits_nh.getParamCached("has_jerk_limits", has_jerk_limits)) {
+  bool has_jerk_limits(false);
+  DJLI_GET_CACHE("has_jerk_limits", has_jerk_limits);
+  double max_jerk;
+  DJLI_GET_CACHE("max_jerk", max_jerk);
+  if (has_jerk_limits_loaded) {
     if (!has_jerk_limits) {
       limits.has_jerk_limits = false;
     }
-    double max_jerk;
-    if (has_jerk_limits && limits_nh.getParamCached("max_jerk", max_jerk)) {
+    if (has_jerk_limits && max_jerk_loaded) {
       limits.has_jerk_limits = true;
       limits.max_jerk = max_jerk;
     }
   }
 
   // Effort limits
-  bool has_effort_limits = false;
-  if (limits_nh.getParamCached("has_effort_limits", has_effort_limits)) {
-    if (!has_effort_limits) {
+  bool has_eff_limits(false);
+  DJLI_GET_CACHE("has_effort_limits", has_eff_limits);
+  double max_eff;
+  DJLI_GET_CACHE("max_effort", max_eff);
+  if (has_eff_limits_loaded) {
+    if (!has_eff_limits) {
       limits.has_effort_limits = false;
     }
-    double max_effort;
-    if (has_effort_limits && limits_nh.getParamCached("max_effort", max_effort)) {
+    if (has_eff_limits && max_eff_loaded) {
       limits.has_effort_limits = true;
-      limits.max_effort = max_effort;
+      limits.max_effort = max_eff;
     }
   }
 
