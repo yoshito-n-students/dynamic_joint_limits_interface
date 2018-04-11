@@ -5,10 +5,10 @@
 #include <limits>
 #include <string>
 
+#include <dynamic_joint_limits_interface/joint_limits.h>
 #include <dynamic_joint_limits_interface/joint_limits_rosparam_cached.h>
 #include <hardware_interface/internal/resource_manager.h>
 #include <hardware_interface/joint_command_interface.h>
-#include <joint_limits_interface/joint_limits.h>
 #include <ros/duration.h>
 #include <ros/node_handle.h>
 
@@ -22,9 +22,8 @@ namespace dynamic_joint_limits_interface {
 
 class DynamicPositionJointSaturationHandle {
 public:
-  DynamicPositionJointSaturationHandle(
-      const hardware_interface::JointHandle &jh,
-      const joint_limits_interface::JointLimits &limits = joint_limits_interface::JointLimits())
+  DynamicPositionJointSaturationHandle(const hardware_interface::JointHandle &jh,
+                                       const JointLimits &limits = JointLimits())
       : jh_(jh), limits_(limits), prev_cmd_(std::numeric_limits< double >::quiet_NaN()) {
     // never throw dislike joint_limits_interface::PositionJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
@@ -68,15 +67,89 @@ public:
 
 private:
   hardware_interface::JointHandle jh_;
-  joint_limits_interface::JointLimits limits_;
+  JointLimits limits_;
+  double prev_cmd_;
+};
+
+class DynamicPositionJointSoftLimitsHandle {
+public:
+  DynamicPositionJointSoftLimitsHandle(const hardware_interface::JointHandle &jh,
+                                       const JointLimits &limits = JointLimits(),
+                                       const SoftJointLimits &soft_limits = SoftJointLimits())
+      : jh_(jh), limits_(limits), soft_limits_(soft_limits),
+        prev_cmd_(std::numeric_limits< double >::quiet_NaN()) {
+    // never throw dislike joint_limits_interface::PositionJointSoftLimitsHandle
+    // according to the initial limits because it can be updated by updateLimits()
+  }
+
+  std::string getName() const { return jh_.getName(); }
+
+  void enforceLimits(const ros::Duration &period) {
+    // Current position
+    if (std::isnan(prev_cmd_)) {
+      prev_cmd_ = jh_.getPosition();
+    }
+
+    // Velocity bounds
+    double min_vel(-std::numeric_limits< double >::max());
+    double max_vel(std::numeric_limits< double >::max());
+    if (soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
+      // Velocity bounds depend on the velocity limit and the proximity to the position limit
+      min_vel = boost::algorithm::clamp(-soft_limits_.k_position *
+                                            (prev_cmd_ - soft_limits_.min_position),
+                                        -limits_.max_velocity, limits_.max_velocity);
+      max_vel = boost::algorithm::clamp(-soft_limits_.k_position *
+                                            (prev_cmd_ - soft_limits_.max_position),
+                                        -limits_.max_velocity, limits_.max_velocity);
+    } else if (soft_limits_.has_soft_limits && !limits_.has_velocity_limits) {
+      // position limits only
+      min_vel = -soft_limits_.k_position * (prev_cmd_ - soft_limits_.min_position);
+      max_vel = -soft_limits_.k_position * (prev_cmd_ - soft_limits_.max_position);
+    } else if (!soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
+      // velocity limits only
+      min_vel = -limits_.max_velocity;
+      max_vel = limits_.max_velocity;
+    }
+
+    // Position bounds
+    double min_pos(-std::numeric_limits< double >::max());
+    double max_pos(std::numeric_limits< double >::max());
+    if (limits_.has_position_limits) {
+      // position & velocity limits available
+      const double dt(period.toSec());
+      min_pos = std::max(prev_cmd_ + min_vel * dt, limits_.min_position);
+      max_pos = std::min(prev_cmd_ + max_vel * dt, limits_.max_position);
+    } else {
+      // velocity limits only
+      const double dt(period.toSec());
+      min_pos = prev_cmd_ + min_vel * dt;
+      max_pos = prev_cmd_ + max_vel * dt;
+    }
+
+    // Saturate position command according to bounds
+    const double cmd(boost::algorithm::clamp(jh_.getCommand(), min_pos, max_pos));
+    jh_.setCommand(cmd);
+    prev_cmd_ = cmd;
+  }
+
+  void updateLimits(ros::NodeHandle &nh) {
+    getJointLimitsCached(getName(), nh, limits_);
+    getSoftJointLimitsCached(getName(), nh, soft_limits_);
+  }
+
+  void reset() { prev_cmd_ = std::numeric_limits< double >::quiet_NaN(); }
+
+private:
+  hardware_interface::JointHandle jh_;
+  JointLimits limits_;
+  SoftJointLimits soft_limits_;
   double prev_cmd_;
 };
 
 class DynamicVelocityJointSaturationHandle {
 public:
-  DynamicVelocityJointSaturationHandle(
-      const hardware_interface::JointHandle &jh,
-      const joint_limits_interface::JointLimits &limits = joint_limits_interface::JointLimits())
+  DynamicVelocityJointSaturationHandle(const hardware_interface::JointHandle &jh,
+                                       const JointLimits &limits = JointLimits())
       : jh_(jh), limits_(limits) {
     // never throw dislike joint_limits_interface::VelocityJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
@@ -114,14 +187,13 @@ public:
 
 private:
   hardware_interface::JointHandle jh_;
-  joint_limits_interface::JointLimits limits_;
+  JointLimits limits_;
 };
 
 class DynamicEffortJointSaturationHandle {
 public:
-  DynamicEffortJointSaturationHandle(
-      const hardware_interface::JointHandle &jh,
-      const joint_limits_interface::JointLimits &limits = joint_limits_interface::JointLimits())
+  DynamicEffortJointSaturationHandle(const hardware_interface::JointHandle &jh,
+                                     const JointLimits &limits = JointLimits())
       : jh_(jh), limits_(limits) {
     // never throw dislike joint_limits_interface::EffortJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
@@ -165,7 +237,7 @@ public:
 
 private:
   hardware_interface::JointHandle jh_;
-  joint_limits_interface::JointLimits limits_;
+  JointLimits limits_;
 };
 
 // this is almost an equivarent to joint_limits_interface::JointLimitsInterface

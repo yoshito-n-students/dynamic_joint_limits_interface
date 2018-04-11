@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <joint_limits_interface/joint_limits.h>
+#include <dynamic_joint_limits_interface/joint_limits.h>
 #include <ros/console.h>
 #include <ros/node_handle.h>
 
@@ -21,7 +21,7 @@ namespace dynamic_joint_limits_interface {
 // this is almost equivarent to joint_limits_interface::getJointLimits()
 // but uses getParamCached() instead of getParam() to avoid blocking access to the parameter server
 inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeHandle &nh,
-                                 joint_limits_interface::JointLimits &limits) {
+                                 JointLimits &limits) {
   // Node handle scoped where the joint limits are defined
   ros::NodeHandle limits_nh;
   try {
@@ -34,7 +34,7 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
   }
 
   // Position limits
-  bool has_pos_limits(false);
+  bool has_pos_limits;
   DJLI_GET_CACHE("has_position_limits", has_pos_limits);
   double min_pos, max_pos;
   DJLI_GET_CACHE("min_position", min_pos);
@@ -56,7 +56,7 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
   }
 
   // Velocity limits
-  bool has_vel_limits(false);
+  bool has_vel_limits;
   DJLI_GET_CACHE("has_velocity_limits", has_vel_limits);
   double max_vel;
   DJLI_GET_CACHE("max_velocity", max_vel);
@@ -71,7 +71,7 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
   }
 
   // Acceleration limits
-  bool has_acc_limits(false);
+  bool has_acc_limits;
   DJLI_GET_CACHE("has_acceleration_limits", has_acc_limits);
   double max_acc;
   DJLI_GET_CACHE("max_acceleration", max_acc);
@@ -86,7 +86,7 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
   }
 
   // Jerk limits
-  bool has_jerk_limits(false);
+  bool has_jerk_limits;
   DJLI_GET_CACHE("has_jerk_limits", has_jerk_limits);
   double max_jerk;
   DJLI_GET_CACHE("max_jerk", max_jerk);
@@ -101,7 +101,7 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
   }
 
   // Effort limits
-  bool has_eff_limits(false);
+  bool has_eff_limits;
   DJLI_GET_CACHE("has_effort_limits", has_eff_limits);
   double max_eff;
   DJLI_GET_CACHE("max_effort", max_eff);
@@ -121,7 +121,7 @@ inline bool getJointLimitsCached(const std::string &joint_name, const ros::NodeH
 // this is almost equivarent to joint_limits_interface::getSoftJointLimits()
 // but uses getParamCached() instead of getParam() to avoid blocking access to the parameter server
 inline bool getSoftJointLimitsCached(const std::string &joint_name, const ros::NodeHandle &nh,
-                                     joint_limits_interface::SoftJointLimits &soft_limits) {
+                                     SoftJointLimits &soft_limits) {
   // Node handle scoped where the soft joint limits are defined
   ros::NodeHandle limits_nh;
   try {
@@ -144,8 +144,12 @@ inline bool getSoftJointLimitsCached(const std::string &joint_name, const ros::N
   DJLI_GET_CACHE("soft_upper_limit", soft_upper_limit);
   DJLI_GET_CACHE("soft_lower_limit", soft_lower_limit);
   if (has_soft_limits_loaded) {
-    if (has_soft_limits && k_position_loaded && k_velocity_loaded && soft_lower_limit_loaded &&
-        soft_upper_limit_loaded) {
+    if (!has_soft_limits) {
+      soft_limits.has_soft_limits = false;
+    }
+    if (has_soft_limits && k_position_loaded && k_velocity_loaded && soft_upper_limit_loaded &&
+        soft_lower_limit_loaded) {
+      soft_limits.has_soft_limits = true;
       soft_limits.k_position = k_position;
       soft_limits.k_velocity = k_velocity;
       soft_limits.max_position = soft_upper_limit;
