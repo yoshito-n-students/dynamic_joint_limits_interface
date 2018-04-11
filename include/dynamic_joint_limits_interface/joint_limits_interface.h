@@ -17,7 +17,7 @@
 
 namespace dynamic_joint_limits_interface {
 
-// they are almost equivarents to joint_limits_interface::XXXJointSaturationHandle
+// they are almost equivarents to joint_limits_interface::XXXJointYyyHandle
 // but can update limits after construction by updateLimits()
 
 class PositionJointSaturationHandle {
@@ -264,13 +264,34 @@ public:
   }
 };
 
-// they are almost equivarents to joint_limits_interface::XXXJointSaturationInterface
-// but inherits DynamicXXXJointSaturationInterface
+// they are almost equivarents to joint_limits_interface::XxxJointYyyInterface
+// but inherits DynamicXxxJointYyyInterface
 
 class PositionJointSaturationInterface
     : public JointLimitsInterface< PositionJointSaturationHandle > {
 public:
   virtual ~PositionJointSaturationInterface() {}
+
+  void reset() {
+    BOOST_FOREACH (ResourceMap::value_type &resource_pair, resource_map_) {
+      resource_pair.second.reset();
+    }
+  }
+
+  bool reset(const std::string &name) {
+    const ResourceMap::iterator handle(resource_map_.find(name));
+    if (handle == resource_map_.end()) {
+      return false;
+    }
+    handle->second.reset();
+    return true;
+  }
+};
+
+class PositionJointSoftLimitsInterface
+    : public JointLimitsInterface< PositionJointSoftLimitsHandle > {
+public:
+  virtual ~PositionJointSoftLimitsInterface() {}
 
   void reset() {
     BOOST_FOREACH (ResourceMap::value_type &resource_pair, resource_map_) {
