@@ -102,7 +102,7 @@ public:
                                             (prev_cmd_ - soft_limits_.max_position),
                                         -limits_.max_velocity, limits_.max_velocity);
     } else if (soft_limits_.has_soft_limits && !limits_.has_velocity_limits) {
-      // position limits only
+      // soft limits only
       min_vel = -soft_limits_.k_position * (prev_cmd_ - soft_limits_.min_position);
       max_vel = -soft_limits_.k_position * (prev_cmd_ - soft_limits_.max_position);
     } else if (!soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
@@ -188,6 +188,54 @@ public:
 private:
   hardware_interface::JointHandle jh_;
   JointLimits limits_;
+};
+
+class VelocityJointSoftLimitsHandle {
+public:
+  VelocityJointSoftLimitsHandle(const hardware_interface::JointHandle &jh,
+                                const JointLimits &limits = JointLimits(),
+                                const SoftJointLimits &soft_limits = SoftJointLimits())
+      : jh_(jh), limits_(limits), soft_limits_(soft_limits_) {}
+
+  std::string getName() const { return jh_.getName(); }
+
+  void enforceLimits(const ros::Duration &period) {
+    double min_vel(-std::numeric_limits< double >::max());
+    double max_vel(std::numeric_limits< double >::max());
+    if (soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
+      // Velocity bounds depend on the velocity limit and the proximity to the position limit
+      const double pos(jh_.getPosition());
+      min_vel =
+          boost::algorithm::clamp(-soft_limits_.k_position * (pos - soft_limits_.min_position),
+                                  -limits_.max_velocity, limits_.max_velocity);
+      max_vel =
+          boost::algorithm::clamp(-soft_limits_.k_position * (pos - soft_limits_.max_position),
+                                  -limits_.max_velocity, limits_.max_velocity);
+    } else if (soft_limits_.has_soft_limits && !limits_.has_velocity_limits) {
+      // soft limits only
+      const double pos(jh_.getPosition());
+      min_vel = -soft_limits_.k_position * (pos - soft_limits_.min_position);
+      max_vel = -soft_limits_.k_position * (pos - soft_limits_.max_position);
+    } else if (!soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
+      // velocity limits only
+      min_vel = -limits_.max_velocity;
+      max_vel = limits_.max_velocity;
+    }
+
+    if (limits_.has_acceleration_limits) {
+      const double vel(jh_.getVelocity());
+      const double delta_vel(limits_.max_acceleration * period.toSec());
+      min_vel = std::max(vel - delta_vel, min_vel);
+      max_vel = std::min(vel + delta_vel, max_vel);
+    }
+
+    jh_.setCommand(boost::algorithm::clamp(jh_.getCommand(), min_vel, max_vel));
+  }
+
+private:
+  hardware_interface::JointHandle jh_;
+  JointLimits limits_;
+  SoftJointLimits soft_limits_;
 };
 
 class EffortJointSaturationHandle {
@@ -313,6 +361,12 @@ class VelocityJointSaturationInterface
     : public JointLimitsInterface< VelocityJointSaturationHandle > {
 public:
   virtual ~VelocityJointSaturationInterface() {}
+};
+
+class VelocityJointSoftLimitsInterface
+    : public JointLimitsInterface< VelocityJointSoftLimitsHandle > {
+public:
+  virtual ~VelocityJointSoftLimitsInterface() {}
 };
 
 class EffortJointSaturationInterface : public JointLimitsInterface< EffortJointSaturationHandle > {
