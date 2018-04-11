@@ -80,7 +80,7 @@ public:
 private:
   ros::NodeHandle root_nh_;
 
-  hardware_interface::JointStateInterface state_iface_;
+  hi::JointStateInterface state_iface_;
 
   hi::PositionJointInterface pos_iface_;
   hi::VelocityJointInterface vel_iface_;
