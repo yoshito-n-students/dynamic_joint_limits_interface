@@ -33,7 +33,7 @@ struct Range {
   double min, max;
 };
 
-// they are almost equivarents to joint_limits_interface::XXXJointYyyHandle
+// they are almost equivarents to joint_limits_interface::XxxJointYyyHandle
 // but can update limits after construction by updateLimits()
 
 class PositionJointSaturationHandle {
@@ -311,6 +311,9 @@ template < class LimitsHandle >
 class JointLimitsInterface : public hardware_interface::ResourceManager< LimitsHandle > {
 protected:
   typedef typename hardware_interface::ResourceManager< LimitsHandle > Base;
+
+public:
+  typedef LimitsHandle Handle;
 
 public:
   virtual ~JointLimitsInterface() {}
