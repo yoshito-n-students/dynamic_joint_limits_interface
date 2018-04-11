@@ -1,0 +1,5 @@
+has_soft_limits: false
+soft_lower_limit: 0.0
+soft_upper_limits: 0.0
+k_position: 0.0
+k_velocity: 0.0
