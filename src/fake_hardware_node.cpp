@@ -1,7 +1,7 @@
 #include <cmath>
 
 #include <controller_manager/controller_manager.h>
-#include <dynamic_joint_limits_interface/dynamic_joint_limits_interface.h>
+#include <dynamic_joint_limits_interface/joint_limits_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <ros/console.h>
@@ -40,9 +40,9 @@ public:
     eff_iface_.registerHandle(eff_handle);
 
     // register limits handles to enable limits
-    pos_sat_iface_.registerHandle(djli::DynamicPositionJointSaturationHandle(pos_handle));
-    vel_sat_iface_.registerHandle(djli::DynamicVelocityJointSaturationHandle(vel_handle));
-    eff_sat_iface_.registerHandle(djli::DynamicEffortJointSaturationHandle(eff_handle));
+    pos_sat_iface_.registerHandle(djli::PositionJointSaturationHandle(pos_handle));
+    vel_sat_iface_.registerHandle(djli::VelocityJointSaturationHandle(vel_handle));
+    eff_sat_iface_.registerHandle(djli::EffortJointSaturationHandle(eff_handle));
 
     // do first update which will perform blocking access to the paremeter server
     pos_sat_iface_.updateLimits(root_nh_);
@@ -86,9 +86,9 @@ private:
   hi::VelocityJointInterface vel_iface_;
   hi::EffortJointInterface eff_iface_;
 
-  djli::DynamicPositionJointSaturationInterface pos_sat_iface_;
-  djli::DynamicVelocityJointSaturationInterface vel_sat_iface_;
-  djli::DynamicEffortJointSaturationInterface eff_sat_iface_;
+  djli::PositionJointSaturationInterface pos_sat_iface_;
+  djli::VelocityJointSaturationInterface vel_sat_iface_;
+  djli::EffortJointSaturationInterface eff_sat_iface_;
 
   double pos_, vel_, eff_;
   double pos_cmd_, vel_cmd_, eff_cmd_;

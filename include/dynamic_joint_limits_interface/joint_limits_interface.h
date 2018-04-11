@@ -1,5 +1,5 @@
-#ifndef DYNAMIC_JOINT_LIMITS_INTERFACE_DYNAMIC_JOINT_LIMITS_INTERFACE_H
-#define DYNAMIC_JOINT_LIMITS_INTERFACE_DYNAMIC_JOINT_LIMITS_INTERFACE_H
+#ifndef DYNAMIC_JOINT_LIMITS_INTERFACE_JOINT_LIMITS_INTERFACE_H
+#define DYNAMIC_JOINT_LIMITS_INTERFACE_JOINT_LIMITS_INTERFACE_H
 
 #include <cmath>
 #include <limits>
@@ -20,16 +20,16 @@ namespace dynamic_joint_limits_interface {
 // they are almost equivarents to joint_limits_interface::XXXJointSaturationHandle
 // but can update limits after construction by updateLimits()
 
-class DynamicPositionJointSaturationHandle {
+class PositionJointSaturationHandle {
 public:
-  DynamicPositionJointSaturationHandle(const hardware_interface::JointHandle &jh,
-                                       const JointLimits &limits = JointLimits())
+  PositionJointSaturationHandle(const hardware_interface::JointHandle &jh,
+                                const JointLimits &limits = JointLimits())
       : jh_(jh), limits_(limits), prev_cmd_(std::numeric_limits< double >::quiet_NaN()) {
     // never throw dislike joint_limits_interface::PositionJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
   }
 
-  virtual ~DynamicPositionJointSaturationHandle() {}
+  virtual ~PositionJointSaturationHandle() {}
 
   std::string getName() const { return jh_.getName(); }
 
@@ -71,11 +71,11 @@ private:
   double prev_cmd_;
 };
 
-class DynamicPositionJointSoftLimitsHandle {
+class PositionJointSoftLimitsHandle {
 public:
-  DynamicPositionJointSoftLimitsHandle(const hardware_interface::JointHandle &jh,
-                                       const JointLimits &limits = JointLimits(),
-                                       const SoftJointLimits &soft_limits = SoftJointLimits())
+  PositionJointSoftLimitsHandle(const hardware_interface::JointHandle &jh,
+                                const JointLimits &limits = JointLimits(),
+                                const SoftJointLimits &soft_limits = SoftJointLimits())
       : jh_(jh), limits_(limits), soft_limits_(soft_limits),
         prev_cmd_(std::numeric_limits< double >::quiet_NaN()) {
     // never throw dislike joint_limits_interface::PositionJointSoftLimitsHandle
@@ -146,16 +146,16 @@ private:
   double prev_cmd_;
 };
 
-class DynamicVelocityJointSaturationHandle {
+class VelocityJointSaturationHandle {
 public:
-  DynamicVelocityJointSaturationHandle(const hardware_interface::JointHandle &jh,
-                                       const JointLimits &limits = JointLimits())
+  VelocityJointSaturationHandle(const hardware_interface::JointHandle &jh,
+                                const JointLimits &limits = JointLimits())
       : jh_(jh), limits_(limits) {
     // never throw dislike joint_limits_interface::VelocityJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
   }
 
-  virtual ~DynamicVelocityJointSaturationHandle() {}
+  virtual ~VelocityJointSaturationHandle() {}
 
   std::string getName() const { return jh_.getName(); }
 
@@ -190,16 +190,16 @@ private:
   JointLimits limits_;
 };
 
-class DynamicEffortJointSaturationHandle {
+class EffortJointSaturationHandle {
 public:
-  DynamicEffortJointSaturationHandle(const hardware_interface::JointHandle &jh,
-                                     const JointLimits &limits = JointLimits())
+  EffortJointSaturationHandle(const hardware_interface::JointHandle &jh,
+                              const JointLimits &limits = JointLimits())
       : jh_(jh), limits_(limits) {
     // never throw dislike joint_limits_interface::EffortJointSaturationHandle
     // according to the initial limits because it can be updated by updateLimits()
   }
 
-  virtual ~DynamicEffortJointSaturationHandle() {}
+  virtual ~EffortJointSaturationHandle() {}
 
   std::string getName() const { return jh_.getName(); }
 
@@ -244,12 +244,12 @@ private:
 // but has updateLimits() which updates limits in managed handles
 
 template < class LimitsHandle >
-class DynamicJointLimitsInterface : public hardware_interface::ResourceManager< LimitsHandle > {
+class JointLimitsInterface : public hardware_interface::ResourceManager< LimitsHandle > {
 protected:
   typedef typename hardware_interface::ResourceManager< LimitsHandle > Base;
 
 public:
-  virtual ~DynamicJointLimitsInterface() {}
+  virtual ~JointLimitsInterface() {}
 
   void enforceLimits(const ros::Duration &period) {
     BOOST_FOREACH (typename Base::ResourceMap::value_type &resource_pair, Base::resource_map_) {
@@ -267,10 +267,10 @@ public:
 // they are almost equivarents to joint_limits_interface::XXXJointSaturationInterface
 // but inherits DynamicXXXJointSaturationInterface
 
-class DynamicPositionJointSaturationInterface
-    : public DynamicJointLimitsInterface< DynamicPositionJointSaturationHandle > {
+class PositionJointSaturationInterface
+    : public JointLimitsInterface< PositionJointSaturationHandle > {
 public:
-  virtual ~DynamicPositionJointSaturationInterface() {}
+  virtual ~PositionJointSaturationInterface() {}
 
   void reset() {
     BOOST_FOREACH (ResourceMap::value_type &resource_pair, resource_map_) {
@@ -288,16 +288,15 @@ public:
   }
 };
 
-class DynamicVelocityJointSaturationInterface
-    : public DynamicJointLimitsInterface< DynamicVelocityJointSaturationHandle > {
+class VelocityJointSaturationInterface
+    : public JointLimitsInterface< VelocityJointSaturationHandle > {
 public:
-  virtual ~DynamicVelocityJointSaturationInterface() {}
+  virtual ~VelocityJointSaturationInterface() {}
 };
 
-class DynamicEffortJointSaturationInterface
-    : public DynamicJointLimitsInterface< DynamicEffortJointSaturationHandle > {
+class EffortJointSaturationInterface : public JointLimitsInterface< EffortJointSaturationHandle > {
 public:
-  virtual ~DynamicEffortJointSaturationInterface() {}
+  virtual ~EffortJointSaturationInterface() {}
 };
 
 } // namespace dynamic_joint_limits_interface
