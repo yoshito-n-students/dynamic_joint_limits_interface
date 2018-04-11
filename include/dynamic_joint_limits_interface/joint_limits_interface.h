@@ -17,6 +17,22 @@
 
 namespace dynamic_joint_limits_interface {
 
+// helper to deal with range of saturation
+struct Range {
+  Range(const double _min, const double _max) : min(_min), max(_max) {}
+  // initializers
+  static Range entire() {
+    return Range(-std::numeric_limits< double >::max(), std::numeric_limits< double >::max());
+  }
+  static Range positive() { return Range(0., std::numeric_limits< double >::max()); }
+  static Range negative() { return Range(-std::numeric_limits< double >::max(), 0.); }
+  // saturation
+  double clamp(const double val) const { return boost::algorithm::clamp(val, min, max); }
+  Range clamp(const Range &range) const { return Range(clamp(range.min), clamp(range.max)); }
+
+  double min, max;
+};
+
 // they are almost equivarents to joint_limits_interface::XXXJointYyyHandle
 // but can update limits after construction by updateLimits()
 
@@ -38,25 +54,16 @@ public:
       prev_cmd_ = jh_.getPosition();
     }
 
-    double min_pos(-std::numeric_limits< double >::max());
-    double max_pos(std::numeric_limits< double >::max());
-    if (limits_.has_position_limits && limits_.has_velocity_limits) {
-      // position & velocity limits available
+    Range pos_range(Range::entire());
+    if (limits_.has_velocity_limits) {
       const double delta_pos(limits_.max_velocity * period.toSec());
-      min_pos = std::max(prev_cmd_ - delta_pos, limits_.min_position);
-      max_pos = std::min(prev_cmd_ + delta_pos, limits_.max_position);
-    } else if (limits_.has_position_limits && !limits_.has_velocity_limits) {
-      // position limits only
-      min_pos = limits_.min_position;
-      max_pos = limits_.max_position;
-    } else if (!limits_.has_position_limits && limits_.has_velocity_limits) {
-      // velocity limits only
-      const double delta_pos(limits_.max_velocity * period.toSec());
-      min_pos = prev_cmd_ - delta_pos;
-      max_pos = prev_cmd_ + delta_pos;
+      pos_range = Range(prev_cmd_ - delta_pos, prev_cmd_ + delta_pos).clamp(pos_range);
+    }
+    if (limits_.has_position_limits) {
+      pos_range = Range(limits_.min_position, limits_.max_position).clamp(pos_range);
     }
 
-    const double cmd(boost::algorithm::clamp(jh_.getCommand(), min_pos, max_pos));
+    const double cmd(pos_range.clamp(jh_.getCommand()));
     jh_.setCommand(cmd);
     prev_cmd_ = cmd;
   }
@@ -85,49 +92,30 @@ public:
   std::string getName() const { return jh_.getName(); }
 
   void enforceLimits(const ros::Duration &period) {
-    // Current position
     if (std::isnan(prev_cmd_)) {
       prev_cmd_ = jh_.getPosition();
     }
 
     // Velocity bounds
-    double min_vel(-std::numeric_limits< double >::max());
-    double max_vel(std::numeric_limits< double >::max());
-    if (soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
-      // Velocity bounds depend on the velocity limit and the proximity to the position limit
-      min_vel = boost::algorithm::clamp(-soft_limits_.k_position *
-                                            (prev_cmd_ - soft_limits_.min_position),
-                                        -limits_.max_velocity, limits_.max_velocity);
-      max_vel = boost::algorithm::clamp(-soft_limits_.k_position *
-                                            (prev_cmd_ - soft_limits_.max_position),
-                                        -limits_.max_velocity, limits_.max_velocity);
-    } else if (soft_limits_.has_soft_limits && !limits_.has_velocity_limits) {
-      // soft limits only
-      min_vel = -soft_limits_.k_position * (prev_cmd_ - soft_limits_.min_position);
-      max_vel = -soft_limits_.k_position * (prev_cmd_ - soft_limits_.max_position);
-    } else if (!soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
-      // velocity limits only
-      min_vel = -limits_.max_velocity;
-      max_vel = limits_.max_velocity;
+    Range vel_range(Range::entire());
+    if (soft_limits_.has_soft_limits) {
+      vel_range = Range(-soft_limits_.k_position * (prev_cmd_ - soft_limits_.min_position),
+                        -soft_limits_.k_position * (prev_cmd_ - soft_limits_.max_position))
+                      .clamp(vel_range);
+    }
+    if (limits_.has_velocity_limits) {
+      vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
     }
 
     // Position bounds
-    double min_pos(-std::numeric_limits< double >::max());
-    double max_pos(std::numeric_limits< double >::max());
+    const double dt(period.toSec());
+    Range pos_range(prev_cmd_ + vel_range.min * dt, prev_cmd_ + vel_range.max * dt);
     if (limits_.has_position_limits) {
-      // position & velocity limits available
-      const double dt(period.toSec());
-      min_pos = std::max(prev_cmd_ + min_vel * dt, limits_.min_position);
-      max_pos = std::min(prev_cmd_ + max_vel * dt, limits_.max_position);
-    } else {
-      // velocity limits only
-      const double dt(period.toSec());
-      min_pos = prev_cmd_ + min_vel * dt;
-      max_pos = prev_cmd_ + max_vel * dt;
+      pos_range = Range(limits_.min_position, limits_.max_position).clamp(pos_range);
     }
 
     // Saturate position command according to bounds
-    const double cmd(boost::algorithm::clamp(jh_.getCommand(), min_pos, max_pos));
+    const double cmd(pos_range.clamp(jh_.getCommand()));
     jh_.setCommand(cmd);
     prev_cmd_ = cmd;
   }
@@ -160,27 +148,17 @@ public:
   std::string getName() const { return jh_.getName(); }
 
   void enforceLimits(const ros::Duration &period) {
-    double min_vel(-std::numeric_limits< double >::max());
-    double max_vel(std::numeric_limits< double >::max());
-    if (limits_.has_velocity_limits && limits_.has_acceleration_limits) {
-      // velocity & acceleration limits available
+    Range vel_range(Range::entire());
+    if (limits_.has_acceleration_limits) {
       const double vel(jh_.getVelocity());
       const double delta_vel(limits_.max_acceleration * period.toSec());
-      min_vel = std::max(vel - delta_vel, -limits_.max_velocity);
-      max_vel = std::min(vel + delta_vel, limits_.max_velocity);
-    } else if (limits_.has_velocity_limits && !limits_.has_acceleration_limits) {
-      // velocity limits only
-      min_vel = -limits_.max_velocity;
-      max_vel = limits_.max_velocity;
-    } else if (!limits_.has_velocity_limits && limits_.has_acceleration_limits) {
-      // acceleration limits only
-      const double vel(jh_.getVelocity());
-      const double delta_vel(limits_.max_acceleration * period.toSec());
-      min_vel = vel - delta_vel;
-      max_vel = vel + delta_vel;
+      vel_range = Range(vel - delta_vel, vel + delta_vel).clamp(vel_range);
+    }
+    if (limits_.has_velocity_limits) {
+      vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
     }
 
-    jh_.setCommand(boost::algorithm::clamp(jh_.getCommand(), min_vel, max_vel));
+    jh_.setCommand(vel_range.clamp(jh_.getCommand()));
   }
 
   void updateLimits(ros::NodeHandle &nh) { getJointLimitsCached(getName(), nh, limits_); }
@@ -200,36 +178,28 @@ public:
   std::string getName() const { return jh_.getName(); }
 
   void enforceLimits(const ros::Duration &period) {
-    double min_vel(-std::numeric_limits< double >::max());
-    double max_vel(std::numeric_limits< double >::max());
-    if (soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
-      // Velocity bounds depend on the velocity limit and the proximity to the position limit
+    Range vel_range(Range::entire());
+    if (soft_limits_.has_soft_limits) {
       const double pos(jh_.getPosition());
-      min_vel =
-          boost::algorithm::clamp(-soft_limits_.k_position * (pos - soft_limits_.min_position),
-                                  -limits_.max_velocity, limits_.max_velocity);
-      max_vel =
-          boost::algorithm::clamp(-soft_limits_.k_position * (pos - soft_limits_.max_position),
-                                  -limits_.max_velocity, limits_.max_velocity);
-    } else if (soft_limits_.has_soft_limits && !limits_.has_velocity_limits) {
-      // soft limits only
-      const double pos(jh_.getPosition());
-      min_vel = -soft_limits_.k_position * (pos - soft_limits_.min_position);
-      max_vel = -soft_limits_.k_position * (pos - soft_limits_.max_position);
-    } else if (!soft_limits_.has_soft_limits && limits_.has_velocity_limits) {
-      // velocity limits only
-      min_vel = -limits_.max_velocity;
-      max_vel = limits_.max_velocity;
+      vel_range = Range(-soft_limits_.k_position * (pos - soft_limits_.min_position),
+                        -soft_limits_.k_position * (pos - soft_limits_.max_position))
+                      .clamp(vel_range);
     }
-
     if (limits_.has_acceleration_limits) {
       const double vel(jh_.getVelocity());
       const double delta_vel(limits_.max_acceleration * period.toSec());
-      min_vel = std::max(vel - delta_vel, min_vel);
-      max_vel = std::min(vel + delta_vel, max_vel);
+      vel_range = Range(vel - delta_vel, vel + delta_vel).clamp(vel_range);
+    }
+    if (limits_.has_velocity_limits) {
+      vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
     }
 
-    jh_.setCommand(boost::algorithm::clamp(jh_.getCommand(), min_vel, max_vel));
+    jh_.setCommand(vel_range.clamp(jh_.getCommand()));
+  }
+
+  void updateLimits(ros::NodeHandle &nh) {
+    getJointLimitsCached(getName(), nh, limits_);
+    getSoftJointLimitsCached(getName(), nh, soft_limits_);
   }
 
 private:
@@ -252,33 +222,28 @@ public:
   std::string getName() const { return jh_.getName(); }
 
   void enforceLimits(const ros::Duration & /* period */) {
-    double min_eff(-std::numeric_limits< double >::max());
-    double max_eff(std::numeric_limits< double >::max());
-    // use effort limits if available
+    Range eff_range(Range::entire());
     if (limits_.has_effort_limits) {
-      min_eff = -limits_.max_effort;
-      max_eff = limits_.max_effort;
+      eff_range = Range(-limits_.max_effort, limits_.max_effort).clamp(eff_range);
     }
-    // clip effort limits if position is out of range
     if (limits_.has_position_limits) {
       const double pos(jh_.getPosition());
       if (pos < limits_.min_position) {
-        min_eff = 0;
+        eff_range = Range::positive().clamp(eff_range);
       } else if (pos > limits_.max_position) {
-        max_eff = 0;
+        eff_range = Range::negative().clamp(eff_range);
       }
     }
-    // clip effort limits if velocity is out of range
     if (limits_.has_velocity_limits) {
       const double vel(jh_.getVelocity());
       if (vel < -limits_.max_velocity) {
-        min_eff = 0;
+        eff_range = Range::positive().clamp(eff_range);
       } else if (vel > limits_.max_velocity) {
-        max_eff = 0;
+        eff_range = Range::negative().clamp(eff_range);
       }
     }
 
-    jh_.setCommand(boost::algorithm::clamp(jh_.getCommand(), min_eff, max_eff));
+    jh_.setCommand(eff_range.clamp(jh_.getCommand()));
   }
 
   void updateLimits(ros::NodeHandle &nh) { getJointLimitsCached(getName(), nh, limits_); }
@@ -286,6 +251,55 @@ public:
 private:
   hardware_interface::JointHandle jh_;
   JointLimits limits_;
+};
+
+class EffortJointSoftLimitsHandle {
+public:
+  EffortJointSoftLimitsHandle(const hardware_interface::JointHandle &jh,
+                              const JointLimits &limits = JointLimits(),
+                              const SoftJointLimits &soft_limits = SoftJointLimits())
+      : jh_(jh), limits_(limits), soft_limits_(soft_limits) {}
+
+  std::string getName() const { return jh_.getName(); }
+
+  void enforceLimits(const ros::Duration & /*period*/) {
+    // Velocity bounds
+    Range vel_range(Range::entire());
+    if (soft_limits_.has_soft_limits) {
+      const double pos(jh_.getPosition());
+      vel_range = Range(-soft_limits_.k_position * (pos - soft_limits_.min_position),
+                        -soft_limits_.k_position * (pos - soft_limits_.max_position))
+                      .clamp(vel_range);
+    }
+    if (limits_.has_velocity_limits) {
+      vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
+    }
+
+    // Effort bounds depend on the velocity and effort bounds
+    Range eff_range(Range::entire());
+    if (soft_limits_.has_soft_limits) {
+      const double vel(jh_.getVelocity());
+      eff_range = Range(-soft_limits_.k_velocity * (vel - vel_range.min),
+                        -soft_limits_.k_velocity * (vel - vel_range.max))
+                      .clamp(eff_range);
+    }
+    if (limits_.has_effort_limits) {
+      eff_range = Range(-limits_.max_effort, limits_.max_effort).clamp(eff_range);
+    }
+
+    // Saturate effort command according to bounds
+    jh_.setCommand(eff_range.clamp(jh_.getCommand()));
+  }
+
+  void updateLimits(ros::NodeHandle &nh) {
+    getJointLimitsCached(getName(), nh, limits_);
+    getSoftJointLimitsCached(getName(), nh, soft_limits_);
+  }
+
+private:
+  hardware_interface::JointHandle jh_;
+  JointLimits limits_;
+  SoftJointLimits soft_limits_;
 };
 
 // this is almost an equivarent to joint_limits_interface::JointLimitsInterface
@@ -372,6 +386,11 @@ public:
 class EffortJointSaturationInterface : public JointLimitsInterface< EffortJointSaturationHandle > {
 public:
   virtual ~EffortJointSaturationInterface() {}
+};
+
+class EffortJointSoftLimitsInterface : public JointLimitsInterface< EffortJointSoftLimitsHandle > {
+public:
+  virtual ~EffortJointSoftLimitsInterface() {}
 };
 
 } // namespace dynamic_joint_limits_interface
