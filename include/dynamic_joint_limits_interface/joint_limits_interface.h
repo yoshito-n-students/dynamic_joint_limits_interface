@@ -271,6 +271,7 @@ public:
                         -soft_limits_.k_position * (pos - soft_limits_.max_position))
                       .clamp(vel_range);
     }
+    // consider acc limits like VelocityJointSoftLimitsHandle??
     if (limits_.has_velocity_limits) {
       vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
     }
@@ -286,6 +287,7 @@ public:
     if (limits_.has_effort_limits) {
       eff_range = Range(-limits_.max_effort, limits_.max_effort).clamp(eff_range);
     }
+    // consider pos & vel limits like EffortJointSaturationHandle??
 
     // Saturate effort command according to bounds
     jh_.setCommand(eff_range.clamp(jh_.getCommand()));
