@@ -80,7 +80,10 @@ public:
 
   virtual void update(const ros::Duration &period) {
     if (!std::isnan(cmd_)) {
-      // TODO: update pos & vel
+      const double M(1.), D(1.); // assuming mass & damper system
+      const double dt(period.toSec());
+      vel_ += (eff_ - D * vel_) / M * dt; // assuming effort is torque
+      pos_ += vel_ * dt;
       eff_ = cmd_;
     }
   }
