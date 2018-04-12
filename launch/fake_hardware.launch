@@ -3,34 +3,40 @@
     <!-- controller decsriptions -->
     <param name="joint_state_controller/type" value="joint_state_controller/JointStateController" />
     <param name="joint_state_controller/publish_rate" value="10.0" />
-    <param name="position_controller/type" value="position_controllers/JointPositionController" />
-    <param name="position_controller/joint" value="joint" />
-    <param name="velocity_controller/type" value="velocity_controllers/JointVelocityController" />
-    <param name="velocity_controller/joint" value="joint" />
-    <param name="effort_controller/type" value="effort_controllers/JointEffortController" />
-    <param name="effort_controller/joint" value="joint" />
+    <param name="pos_joint_controller/type" value="position_controllers/JointPositionController" />
+    <param name="pos_joint_controller/joint" value="pos_joint" />
+    <param name="pos_soft_joint_controller/type" value="position_controllers/JointPositionController" />
+    <param name="pos_soft_joint_controller/joint" value="pos_soft_joint" />
+    <param name="vel_joint_controller/type" value="velocity_controllers/JointVelocityController" />
+    <param name="vel_joint_controller/joint" value="vel_joint" />
+    <param name="vel_soft_joint_controller/type" value="velocity_controllers/JointVelocityController" />
+    <param name="vel_soft_joint_controller/joint" value="vel_soft_joint" />
+    <param name="eff_joint_controller/type" value="effort_controllers/JointEffortController" />
+    <param name="eff_joint_controller/joint" value="eff_joint" />
+    <param name="eff_soft_joint_controller/type" value="effort_controllers/JointEffortController" />
+    <param name="eff_soft_joint_controller/joint" value="eff_soft_joint" />
     <!-- -->
-    <!-- joint limits -->
-    <group ns="joint_limits/joint">
-        <param name="has_position_limits" value="true"/>
-        <param name="min_position" value="10.0"/>
-        <param name="max_position" value="10.0"/>
-        <param name="has_velocity_limits" value="true"/>
-        <param name="max_velocity" value="5.0"/>
-        <param name="has_effort_limits" value="true"/>
-        <param name="max_effort" value="3.0"/>
+    <!-- joint limits to be manually updated for tests -->
+    <group ns="joint_limits">
+        <arg name="path" value="$(find dynamic_joint_limits_interface)/launch"/>
+        <rosparam ns="pos_joint" file="$(arg path)/null_joint_limits.yml"/>
+        <rosparam ns="pos_soft_joint" file="$(arg path)/null_joint_limits.yml"/>
+        <rosparam ns="pos_soft_joint" file="$(arg path)/null_soft_joint_limits.yml"/>
+        <rosparam ns="vel_joint" file="$(arg path)/null_joint_limits.yml"/>
+        <rosparam ns="vel_soft_joint" file="$(arg path)/null_joint_limits.yml"/>
+        <rosparam ns="vel_soft_joint" file="$(arg path)/null_soft_joint_limits.yml"/>
+        <rosparam ns="eff_joint" file="$(arg path)/null_joint_limits.yml"/>
+        <rosparam ns="eff_soft_joint" file="$(arg path)/null_joint_limits.yml"/>
+        <rosparam ns="eff_soft_joint" file="$(arg path)/null_soft_joint_limits.yml"/>
     </group>
     <!-- -->
     <!-- a fake hardware which has dynamic_joint_limits_interface -->
     <node name="fake_hardware" pkg="dynamic_joint_limits_interface" type="fake_hardware_node" output="screen"/>
     <!-- -->
-    <!-- a controller starter (load + start) -->
-    <node name="controller_starter" pkg="controller_manager" type="spawner" respawn="false" output="screen" 
-          args="joint_state_controller position_controller"/>
+    <!-- a controller spawner -->
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" 
+          args="joint_state_controller pos_joint_controller pos_soft_joint_controller vel_joint_controller vel_soft_joint_controller eff_joint_controller eff_soft_joint_controller"/>
     <!-- -->
-    <!-- a controller loader (just load) -->
-    <node name="controller_loader" pkg="controller_manager" type="spawner" respawn="false" output="screen" 
-          args="--stopped velocity_controller effort_controller"/>
     <!-- a joint state monitor -->
     <node name="state_monitor" pkg="rostopic" type="rostopic" output="screen" args="echo /joint_states"/>
 </launch>
