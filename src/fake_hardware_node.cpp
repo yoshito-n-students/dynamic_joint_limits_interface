@@ -25,14 +25,15 @@ public:
   FakeJointBase(const std::string &name) : name_(name), pos_(0.), vel_(0.), eff_(0.), cmd_(0.) {}
   virtual ~FakeJointBase() {}
 
-  template < class StateInterface, class CommandInterface, class LimitsInterface >
-  void registerHandles(StateInterface &state_iface, CommandInterface &cmd_iface,
+  template < class CommandInterface, class LimitsInterface >
+  void registerHandles(hi::JointStateInterface &state_iface, CommandInterface &cmd_iface,
                        LimitsInterface &lim_iface) {
     const hi::JointStateHandle state_handle(name_, &pos_, &vel_, &eff_);
     state_iface.registerHandle(state_handle);
     const hi::JointHandle cmd_handle(state_handle, &cmd_);
     cmd_iface.registerHandle(cmd_handle);
-    lim_iface.registerHandle(typename LimitsInterface::Handle(cmd_handle));
+    const typename LimitsInterface::Handle lim_handle(cmd_handle);
+    lim_iface.registerHandle(lim_handle);
   }
 
   virtual void update(const ros::Duration &period) = 0;
@@ -49,11 +50,12 @@ public:
   virtual ~PositionFakeJoint() {}
 
   virtual void update(const ros::Duration &period) {
+    const double prev_pos(pos_);
     if (!std::isnan(cmd_)) {
-      // TODO: update eff
-      vel_ = (cmd_ - pos_) / period.toSec();
       pos_ = cmd_;
     }
+    vel_ = (cmd_ - pos_) / period.toSec();
+    // TODO: update eff
   }
 };
 
@@ -64,11 +66,11 @@ public:
   virtual ~VelocityFakeJoint() {}
 
   virtual void update(const ros::Duration &period) {
+    pos_ += vel_ * period.toSec();
     if (!std::isnan(cmd_)) {
-      // TODO: update eff
-      pos_ += vel_ * period.toSec();
       vel_ = cmd_;
     }
+    // TODO: update eff
   }
 };
 
@@ -79,11 +81,11 @@ public:
   virtual ~EffortFakeJoint() {}
 
   virtual void update(const ros::Duration &period) {
+    const double dt(period.toSec());
+    pos_ += vel_ * dt;
+    const double M(1.), D(1.); // assuming mass & damper system
+    vel_ += (eff_ - D * vel_) / M * dt; // assuming effort is torque
     if (!std::isnan(cmd_)) {
-      const double M(1.), D(1.); // assuming mass & damper system
-      const double dt(period.toSec());
-      vel_ += (eff_ - D * vel_) / M * dt; // assuming effort is torque
-      pos_ += vel_ * dt;
       eff_ = cmd_;
     }
   }
