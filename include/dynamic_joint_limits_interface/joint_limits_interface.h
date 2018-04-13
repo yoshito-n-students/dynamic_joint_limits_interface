@@ -163,6 +163,7 @@ public:
     if (limits_.has_velocity_limits) {
       vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
     }
+    // zero velocity when out of position range like EffortJointSaturationHandle??
 
     jh_.setCommand(vel_range.clamp(jh_.getCommand()));
   }
