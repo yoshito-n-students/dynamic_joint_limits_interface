@@ -18,19 +18,25 @@
 namespace dynamic_joint_limits_interface {
 
 // helper to deal with range of saturation
-struct Range {
-  Range(const double _min, const double _max) : min(_min), max(_max) {}
+class Range {
+public:
+  Range(const double bound0, const double bound1)
+      : min_(std::min(bound0, bound1)), max_(std::max(bound0, bound1)) {}
   // initializers
   static Range entire() {
     return Range(-std::numeric_limits< double >::max(), std::numeric_limits< double >::max());
   }
   static Range positive() { return Range(0., std::numeric_limits< double >::max()); }
   static Range negative() { return Range(-std::numeric_limits< double >::max(), 0.); }
+  // getters
+  double min() const { return min_; }
+  double max() const { return max_; }
   // saturation
-  double clamp(const double val) const { return boost::algorithm::clamp(val, min, max); }
-  Range clamp(const Range &range) const { return Range(clamp(range.min), clamp(range.max)); }
+  double clamp(const double val) const { return boost::algorithm::clamp(val, min_, max_); }
+  Range clamp(const Range &range) const { return Range(clamp(range.min_), clamp(range.max_)); }
 
-  double min, max;
+private:
+  double min_, max_;
 };
 
 // they are almost equivarents to joint_limits_interface::XxxJointYyyHandle
@@ -109,7 +115,7 @@ public:
 
     // Position bounds
     const double dt(period.toSec());
-    Range pos_range(prev_cmd_ + vel_range.min * dt, prev_cmd_ + vel_range.max * dt);
+    Range pos_range(prev_cmd_ + vel_range.min() * dt, prev_cmd_ + vel_range.max() * dt);
     if (limits_.has_position_limits) {
       pos_range = Range(limits_.min_position, limits_.max_position).clamp(pos_range);
     }
@@ -157,6 +163,7 @@ public:
     if (limits_.has_velocity_limits) {
       vel_range = Range(-limits_.max_velocity, limits_.max_velocity).clamp(vel_range);
     }
+    // zero velocity when out of position range like EffortJointSaturationHandle??
 
     jh_.setCommand(vel_range.clamp(jh_.getCommand()));
   }
@@ -280,8 +287,8 @@ public:
     Range eff_range(Range::entire());
     if (soft_limits_.has_soft_limits) {
       const double vel(jh_.getVelocity());
-      eff_range = Range(-soft_limits_.k_velocity * (vel - vel_range.min),
-                        -soft_limits_.k_velocity * (vel - vel_range.max))
+      eff_range = Range(-soft_limits_.k_velocity * (vel - vel_range.min()),
+                        -soft_limits_.k_velocity * (vel - vel_range.max()))
                       .clamp(eff_range);
     }
     if (limits_.has_effort_limits) {

@@ -54,7 +54,7 @@ public:
     if (!std::isnan(cmd_)) {
       pos_ = cmd_;
     }
-    vel_ = (cmd_ - pos_) / period.toSec();
+    vel_ = (cmd_ - prev_pos) / period.toSec();
     // TODO: update eff
   }
 };
